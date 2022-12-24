@@ -10,14 +10,17 @@ jobs:
         uses: actions/checkout@v3
       - name: Login to Docker
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | buildah login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin "${{ secrets.DOCKER_HOST }}"
+      - name: Enable multi-arch
+        run: |
+          sudo podman run --rm --privileged docker.io/tonistiigi/binfmt --install all
       - name: Build the image
         run: |
           buildah bud --squash --format=docker \
             --tag "${{ secrets.DOCKER_TAG }}:6.0" \
             --tag "${{ secrets.DOCKER_TAG }}:latest" \
-            --platform linux/amd64 \
+            --manifest mongodb
+            --platform linux/amd64,linux/arm64 \
             .
       - name: Push the image
         run: |
-          buildah push "${{ secrets.DOCKER_TAG }}:6.0" && \
-          buildah push "${{ secrets.DOCKER_TAG }}:latest"
+          buildah manifest push --all mongodb
