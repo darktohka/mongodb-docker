@@ -22,7 +22,7 @@ function package() {
 
     discovered+=("$next_library")
 
-    if [[ "$next_library" =~ ld-linux-x86-64.so.2$ ]]; then
+    if [[ "$next_library" =~ ^ld-linux-.*.so..$ ]]; then
       continue
     fi
 
@@ -51,7 +51,7 @@ function create_app_dir() {
 
     cp -r "/usr/share/ca-certificates" "$app_dir/usr/share"
 
-    cp /lib64/ld-linux-x86-64.so.2 "$app_dir/lib64/"
+    cp /lib64/ld-linux-*.so.* "$app_dir/lib64/"
     chown -R "$user_id:$user_id" "$app_dir"
 }
 
