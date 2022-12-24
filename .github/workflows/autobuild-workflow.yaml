@@ -23,4 +23,4 @@ jobs:
             .
       - name: Push the image
         run: |
-          buildah manifest push --all mongodb
+          buildah manifest push --all mongodb docker://docker.io/${{ secrets.DOCKER_TAG }}

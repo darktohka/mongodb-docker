@@ -44,14 +44,22 @@ function create_app_dir() {
     binary_dir="$2"
 
     rm -rf "$app_dir"
-    mkdir -p "$app_dir/usr/bin" "$app_dir/lib64" "$app_dir/tmp" "$app_dir/usr/share"
+    mkdir -p "$app_dir/usr/bin" "$app_dir/tmp" "$app_dir/usr/share"
+
+    if [[ -f /lib64 ]]; then
+        mkdir -p "$app_dir/lib64"
+    fi
 
     cp "$binary_dir/mongod" "$app_dir/usr/bin/"
     package "$binary_dir/mongod"
 
     cp -r "/usr/share/ca-certificates" "$app_dir/usr/share"
 
-    cp /lib64/ld-linux-*.so.* "$app_dir/lib64/"
+    if [[ -f /lib64 ]]; then
+      cp /lib64/ld-linux-*.so.* "$app_dir/lib64/" || true
+    fi
+
+    cp /lib/ld-linux-*.so.* "$app_dir/lib/" || true
     chown -R "$user_id:$user_id" "$app_dir"
 }
 
