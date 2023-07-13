@@ -20,6 +20,7 @@ jobs:
             --tag "${{ secrets.DOCKER_TAG }}:latest" \
             --manifest mongodb \
             --platform linux/arm64 \
+            --platform linux/amd64 \
             .
       - name: Push the image
         run: |
