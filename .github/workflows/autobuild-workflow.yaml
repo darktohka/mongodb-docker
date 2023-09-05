@@ -16,7 +16,7 @@ jobs:
       - name: Build the image
         run: |
           buildah bud --squash --format=docker \
-            --tag "${{ secrets.DOCKER_TAG }}:6.0" \
+            --tag "${{ secrets.DOCKER_TAG }}:7.0" \
             --tag "${{ secrets.DOCKER_TAG }}:latest" \
             --manifest mongodb \
             --platform linux/arm64 \

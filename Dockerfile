@@ -10,7 +10,7 @@ RUN \
     echo "Acquire::AllowInsecureRepositories true;" > /etc/apt/apt.conf.d/01-ci && \
     echo "APT::Get::AllowUnauthenticated true;" >> /etc/apt/apt.conf.d/01-ci && \
 # Install MongoDB repository
-    echo "deb http://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/6.0 multiverse" > /etc/apt/sources.list.d/mongodb-org.list && \
+    echo "deb http://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" > /etc/apt/sources.list.d/mongodb-org.list && \
 # Update system
     apt-get update && \
     apt-get --option=Dpkg::Options::=--force-confdef -y upgrade && \

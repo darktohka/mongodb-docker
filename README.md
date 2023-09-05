@@ -9,6 +9,7 @@ This image is based on the Debian Unstable (Debian Sid) image.
 By default, MongoDB listens on 27017. Be sure to open this port in your firewall.
 
 You may have to set up multiple volumes:
+
 - A volume at `/data/db` to keep your database
 - A volume at `/data/logs` to keep your logs
 - A volume at `/data/mongod.conf` for your config
@@ -21,8 +22,8 @@ You may find a default configuration in this repository. Copy the `mongod.conf` 
 ### Docker example
 
 ```
-sudo docker image pull darktohka/mongodb-docker:6.0
-sudo docker run --name mongodb -p 27017:27017 -v $(pwd)/mongod.conf:/data/mongod.conf:ro -v $(pwd)/mongod.pem:/data/mongod.pem:ro -v $(pwd)/data/logs:/data/logs:rw -v $(pwd)/data/db:/data/db:rw darktohka/mongodb-docker:6.0
+sudo docker image pull darktohka/mongodb-docker:7.0
+sudo docker run --name mongodb -p 27017:27017 -v $(pwd)/mongod.conf:/data/mongod.conf:ro -v $(pwd)/mongod.pem:/data/mongod.pem:ro -v $(pwd)/data/logs:/data/logs:rw -v $(pwd)/data/db:/data/db:rw darktohka/mongodb-docker:7.0
 ```
 
 ### Docker-Compose example
@@ -41,7 +42,7 @@ Then create the following `docker-compose.yml` file:
 ```
 services:
   mongodb:
-    image: darktohka/mongodb-docker:6.0
+    image: darktohka/mongodb-docker:7.0
     ports:
     - "27017:27017"
     networks:
