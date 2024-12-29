@@ -1,0 +1,41 @@
+{
+  "name": "darktohka/mongodb-docker",
+  "tags": ["latest", "8.0"],
+  "config": {
+    "entrypoint": ["/usr/bin/mongod", "-f", "/data/mongod.conf"],
+    "workingDir": "/tmp"
+  },
+  "platforms": [
+    {
+      "architecture": "amd64",
+      "layers": [
+        {
+          "type": "dir",
+          "source": "./binary-x86_64",
+          "comment": "https://github.com/darktohka/mongodb-docker"
+        }
+      ]
+    },
+    {
+      "architecture": "arm64",
+      "layers": [
+        {
+          "type": "dir",
+          "source": "./binary-aarch64",
+          "comment": "https://github.com/darktohka/mongodb-docker"
+        }
+      ]
+    },
+    {
+      "architecture": "arm",
+      "variant": "v7",
+      "layers": [
+        {
+          "type": "dir",
+          "source": "./binary-armv7",
+          "comment": "https://github.com/darktohka/mongodb-docker"
+        }
+      ]
+    }
+  ]
+}

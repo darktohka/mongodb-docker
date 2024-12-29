@@ -4,7 +4,7 @@ set -e
 # Global settings:
 user_id="3500"
 
-app_dir="app"
+app_dir="/app"
 binary_dir="/usr/bin"
 
 discovered=()
@@ -43,7 +43,6 @@ function create_app_dir() {
     app_dir="$1"
     binary_dir="$2"
 
-    rm -rf "$app_dir"
     mkdir -p "$app_dir/usr/bin" "$app_dir/tmp" "$app_dir/usr/share"
 
     cp "$binary_dir/mongod" "$app_dir/usr/bin/"
@@ -60,4 +59,17 @@ function create_app_dir() {
     chown -R "$user_id:$user_id" "$app_dir"
 }
 
+function install_mongodb() {
+  # Install MongoDB repository
+  echo "deb [trusted=yes] http://repo.mongodb.org/apt/ubuntu noble/mongodb-org/8.0 multiverse" > /etc/apt/sources.list.d/mongodb-org.list
+
+  # Update system
+  apt-get update
+  apt-get --option=Dpkg::Options::=--force-confdef -y upgrade
+
+  # Install MongoDB server
+  apt-get install -y mongodb-org-server
+}
+
+install_mongodb
 create_app_dir "$app_dir" "$binary_dir"
