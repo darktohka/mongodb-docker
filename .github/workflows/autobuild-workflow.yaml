@@ -15,10 +15,8 @@ jobs:
         run: |
           sudo docker run -d --name build_amd64 -v "./binary-x86_64:/app" -v $(pwd):/scripts --platform linux/amd64 ubuntu:devel /scripts/install_mongodb.sh
           sudo docker run -d --name build_aarch64 -v "./binary-aarch64:/app" -v $(pwd):/scripts --platform linux/arm64 ubuntu:devel /scripts/install_mongodb.sh
-          sudo docker run -d --name build_armv7 -v "./binary-armv7:/app" -v $(pwd):/scripts --platform linux/arm/v7 ubuntu:devel /scripts/install_mongodb.sh
           sudo docker logs -f build_amd64 &
           sudo docker logs -f build_aarch64 &
-          sudo docker logs -f build_armv7 &
           wait
       - name: Push the image
         run: |

@@ -25,17 +25,6 @@
           "comment": "https://github.com/darktohka/mongodb-docker"
         }
       ]
-    },
-    {
-      "architecture": "arm",
-      "variant": "v7",
-      "layers": [
-        {
-          "type": "dir",
-          "source": "./binary-armv7",
-          "comment": "https://github.com/darktohka/mongodb-docker"
-        }
-      ]
     }
   ]
 }
