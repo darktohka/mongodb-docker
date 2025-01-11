@@ -67,8 +67,11 @@ function install_mongodb() {
   apt-get update
   apt-get --option=Dpkg::Options::=--force-confdef -y upgrade
 
-  # Install MongoDB server
-  apt-get install -y mongodb-org-server
+  # Install MongoDB server and binutils (for strip)
+  apt-get install -y mongodb-org-server binutils
+
+  # Strip the binary
+  strip /usr/bin/mongod
 }
 
 install_mongodb
