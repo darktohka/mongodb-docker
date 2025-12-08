@@ -1,6 +1,6 @@
 {
   "name": "darktohka/mongodb-docker",
-  "tags": ["8.0", "latest"],
+  "tags": ["8.2", "latest"],
   "config": {
     "entrypoint": ["/usr/bin/mongod", "-f", "/data/mongod.conf"],
     "workingDir": "/tmp"

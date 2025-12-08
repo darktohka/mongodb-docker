@@ -22,8 +22,8 @@ You may find a default configuration in this repository. Copy the `mongod.conf` 
 ### Docker example
 
 ```
-sudo docker image pull darktohka/mongodb-docker:8.0
-sudo docker run --name mongodb -p 27017:27017 -v $(pwd)/mongod.conf:/data/mongod.conf:ro -v $(pwd)/mongod.pem:/data/mongod.pem:ro -v $(pwd)/data/logs:/data/logs:rw -v $(pwd)/data/db:/data/db:rw darktohka/mongodb-docker:8.0
+sudo docker image pull darktohka/mongodb-docker:8.2
+sudo docker run --name mongodb -p 27017:27017 -v $(pwd)/mongod.conf:/data/mongod.conf:ro -v $(pwd)/mongod.pem:/data/mongod.pem:ro -v $(pwd)/data/logs:/data/logs:rw -v $(pwd)/data/db:/data/db:rw darktohka/mongodb-docker:8.2
 ```
 
 ### Docker-Compose example
@@ -42,7 +42,7 @@ Then create the following `docker-compose.yml` file:
 ```
 services:
   mongodb:
-    image: darktohka/mongodb-docker:8.0
+    image: darktohka/mongodb-docker:8.2
     ports:
     - "27017:27017"
     networks:

@@ -61,7 +61,7 @@ function create_app_dir() {
 
 function install_mongodb() {
   # Install MongoDB repository
-  echo "deb [trusted=yes] http://repo.mongodb.org/apt/ubuntu noble/mongodb-org/8.0 multiverse" > /etc/apt/sources.list.d/mongodb-org.list
+  echo "deb [trusted=yes] http://repo.mongodb.org/apt/ubuntu noble/mongodb-org/8.2 multiverse" > /etc/apt/sources.list.d/mongodb-org.list
 
   # Update system
   apt-get update
