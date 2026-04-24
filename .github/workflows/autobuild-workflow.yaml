@@ -20,4 +20,4 @@ jobs:
           wait
       - name: Push the image
         run: |
-          docker run -v $(pwd):/srv darktohka/ocitool --username "${{ secrets.DOCKER_USERNAME }}" --password "${{ secrets.DOCKER_PASSWORD }}"
+          docker run -v $(pwd):/srv darktohka/ocitool upload --username "${{ secrets.DOCKER_USERNAME }}" --password "${{ secrets.DOCKER_PASSWORD }}"
