@@ -2,6 +2,8 @@ use anyhow::{anyhow, bail, Context, Result};
 use ar::Archive as ArArchive;
 use bzip2::read::BzDecoder;
 use flate2::read::GzDecoder;
+use rayon::prelude::*;
+use rayon::ThreadPool;
 use reqwest::blocking::Client;
 use sha2::{Digest, Sha256};
 use std::fs::{self, File};
@@ -27,6 +29,7 @@ pub fn stage_packages_for_arch(
     packages: &[PackageRecord],
     staging_root: &Path,
     deb_cache_root: &Path,
+    download_pool: &ThreadPool,
 ) -> Result<StageSummary> {
     let rootfs_dir = staging_root.join(arch.deb_arch());
     let cache_dir = deb_cache_root.join(arch.deb_arch());
@@ -36,17 +39,34 @@ pub fn stage_packages_for_arch(
     fs::create_dir_all(&cache_dir)
         .with_context(|| format!("failed to create {}", cache_dir.display()))?;
 
+    let cached_deb_paths: Vec<PathBuf> = packages
+        .iter()
+        .map(|package| cache_path_for_package(&cache_dir, package))
+        .collect();
+
+    let download_results = download_pool.install(|| {
+        packages
+            .par_iter()
+            .zip(cached_deb_paths.par_iter())
+            .map(|(package, cached_deb_path)| {
+                ensure_deb_cached(client, package, cached_deb_path)
+                    .with_context(|| format!("failed to cache {}", package.name))
+            })
+            .collect::<Vec<Result<bool>>>()
+    });
+
     let mut downloaded_count = 0usize;
     let mut downloaded_bytes = 0u64;
 
-    for package in packages {
-        let cached_deb_path = cache_path_for_package(&cache_dir, package);
-        let downloaded = ensure_deb_cached(client, package, &cached_deb_path)?;
+    for (downloaded_result, package) in download_results.into_iter().zip(packages.iter()) {
+        let downloaded = downloaded_result?;
         if downloaded {
             downloaded_count += 1;
             downloaded_bytes += package.size;
         }
+    }
 
+    for (package, cached_deb_path) in packages.iter().zip(cached_deb_paths.iter()) {
         extract_data_archive_from_deb(&cached_deb_path, &rootfs_dir).with_context(|| {
             format!(
                 "failed to extract package {} ({})",

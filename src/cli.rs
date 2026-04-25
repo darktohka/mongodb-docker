@@ -54,4 +54,7 @@ pub struct Cli {
 
     #[arg(long, default_value = "target/deb-cache")]
     pub deb_cache_dir: PathBuf,
+
+    #[arg(long, default_value_t = 8)]
+    pub download_jobs: usize,
 }

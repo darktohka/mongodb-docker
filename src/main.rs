@@ -7,6 +7,7 @@ mod runtime;
 
 use anyhow::{Context, Result};
 use clap::Parser;
+use rayon::ThreadPoolBuilder;
 use reqwest::blocking::Client;
 use serde::Serialize;
 use std::fs;
@@ -67,6 +68,11 @@ fn run(config: BuilderConfig) -> Result<()> {
         .build()
         .context("failed to build HTTP client")?;
 
+    let download_pool = ThreadPoolBuilder::new()
+        .num_threads(config.download_jobs)
+        .build()
+        .context("failed to build download worker pool")?;
+
     fs::create_dir_all(&config.manifest_dir)
         .with_context(|| format!("failed to create {}", config.manifest_dir.display()))?;
     fs::create_dir_all(&config.staging_dir)
@@ -81,13 +87,14 @@ fn run(config: BuilderConfig) -> Result<()> {
         let mut catalog = PackageCatalog::default();
 
         for source in config.sources_for_arch(*arch) {
-            let index = repo::fetch_source_index(&client, &source).with_context(|| {
-                format!(
-                    "failed to fetch package metadata for source {} (arch {})",
-                    source.name,
-                    arch.deb_arch()
-                )
-            })?;
+            let index =
+                repo::fetch_source_index(&client, &source, &download_pool).with_context(|| {
+                    format!(
+                        "failed to fetch package metadata for source {} (arch {})",
+                        source.name,
+                        arch.deb_arch()
+                    )
+                })?;
             catalog.ingest(index);
         }
 
@@ -101,6 +108,7 @@ fn run(config: BuilderConfig) -> Result<()> {
             &closure,
             &config.staging_dir,
             &config.deb_cache_dir,
+            &download_pool,
         )
         .with_context(|| format!("failed to stage packages for {}", arch.deb_arch()))?;
 

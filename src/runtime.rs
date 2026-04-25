@@ -2,9 +2,10 @@ use anyhow::{anyhow, bail, Context, Result};
 use goblin::elf::Elf;
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::ffi::OsString;
 use std::fs;
 use std::os::unix::fs::symlink;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 use crate::config::Arch;
 
@@ -510,9 +511,60 @@ fn remove_existing_path(path: &Path) -> Result<()> {
 }
 
 fn canonical_within_rootfs(rootfs_dir: &Path, path: &Path) -> Result<PathBuf> {
-    let canonical = path
-        .canonicalize()
-        .with_context(|| format!("failed to canonicalize {}", path.display()))?;
+    let mut remaining: VecDeque<PendingComponent> = VecDeque::new();
+    enqueue_initial_components(rootfs_dir, path, &mut remaining)?;
+
+    let mut resolved: Vec<OsString> = Vec::new();
+    let mut symlink_hops = 0usize;
+
+    while let Some(component) = remaining.pop_front() {
+        match component {
+            PendingComponent::CurDir => {}
+            PendingComponent::ParentDir => {
+                if resolved.pop().is_none() {
+                    bail!(
+                        "path {} escapes rootfs {}",
+                        path.display(),
+                        rootfs_dir.display()
+                    );
+                }
+            }
+            PendingComponent::Normal(part) => {
+                let candidate = compose_rootfs_path(rootfs_dir, &resolved, Some(part.as_os_str()));
+                let metadata = fs::symlink_metadata(&candidate).with_context(|| {
+                    format!(
+                        "failed to stat {} while resolving {}",
+                        candidate.display(),
+                        path.display()
+                    )
+                })?;
+
+                if metadata.file_type().is_symlink() {
+                    symlink_hops += 1;
+                    if symlink_hops > 64 {
+                        bail!(
+                            "too many symlink hops while resolving {} within {}",
+                            path.display(),
+                            rootfs_dir.display()
+                        );
+                    }
+
+                    let target = fs::read_link(&candidate).with_context(|| {
+                        format!("failed to read symlink {}", candidate.display())
+                    })?;
+
+                    if target.is_absolute() {
+                        resolved.clear();
+                    }
+                    push_path_components_front(&mut remaining, &target);
+                } else {
+                    resolved.push(part);
+                }
+            }
+        }
+    }
+
+    let canonical = compose_rootfs_path(rootfs_dir, &resolved, None);
     if !canonical.starts_with(rootfs_dir) {
         bail!(
             "path {} resolves outside rootfs {}",
@@ -520,12 +572,134 @@ fn canonical_within_rootfs(rootfs_dir: &Path, path: &Path) -> Result<PathBuf> {
             rootfs_dir.display()
         );
     }
+
     Ok(canonical)
+}
+
+#[derive(Debug)]
+enum PendingComponent {
+    CurDir,
+    ParentDir,
+    Normal(OsString),
+}
+
+fn enqueue_initial_components(
+    rootfs_dir: &Path,
+    path: &Path,
+    queue: &mut VecDeque<PendingComponent>,
+) -> Result<()> {
+    if path.starts_with(rootfs_dir) {
+        let rel = path.strip_prefix(rootfs_dir).with_context(|| {
+            format!(
+                "failed to strip prefix {} from {}",
+                rootfs_dir.display(),
+                path.display()
+            )
+        })?;
+        push_path_components_front(queue, rel);
+        return Ok(());
+    }
+
+    if path.is_absolute() {
+        let rel = path
+            .strip_prefix("/")
+            .with_context(|| format!("failed to strip leading / from {}", path.display()))?;
+        push_path_components_front(queue, rel);
+        return Ok(());
+    }
+
+    push_path_components_front(queue, path);
+    Ok(())
+}
+
+fn push_path_components_front(queue: &mut VecDeque<PendingComponent>, path: &Path) {
+    let mut components = Vec::new();
+    for component in path.components() {
+        match component {
+            Component::CurDir => components.push(PendingComponent::CurDir),
+            Component::ParentDir => components.push(PendingComponent::ParentDir),
+            Component::Normal(part) => {
+                components.push(PendingComponent::Normal(part.to_os_string()))
+            }
+            Component::RootDir | Component::Prefix(_) => {}
+        }
+    }
+
+    for component in components.into_iter().rev() {
+        queue.push_front(component);
+    }
+}
+
+fn compose_rootfs_path(
+    rootfs_dir: &Path,
+    resolved: &[OsString],
+    next: Option<&std::ffi::OsStr>,
+) -> PathBuf {
+    let mut path = rootfs_dir.to_path_buf();
+    for part in resolved {
+        path.push(part);
+    }
+    if let Some(part) = next {
+        path.push(part);
+    }
+    path
 }
 
 fn to_rooted_relative_string(rootfs_dir: &Path, path: &Path) -> String {
     match path.strip_prefix(rootfs_dir) {
         Ok(rel) => format!("/{}", rel.display()),
         Err(_) => path.display().to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn unique_temp_dir(prefix: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time should move forward")
+            .as_nanos();
+        std::env::temp_dir().join(format!(
+            "mongodb-appdir-builder-{}-{}-{}",
+            prefix,
+            std::process::id(),
+            nanos
+        ))
+    }
+
+    #[test]
+    fn resolves_absolute_symlink_target_inside_rootfs() {
+        let rootfs_dir = unique_temp_dir("runtime-symlink");
+        fs::create_dir_all(rootfs_dir.join("usr/lib/x86_64-linux-gnu")).expect("mkdir usr/lib");
+        fs::create_dir_all(rootfs_dir.join("lib64")).expect("mkdir lib64");
+
+        let target = rootfs_dir.join("usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2");
+        fs::write(&target, b"dummy-ld").expect("write loader");
+
+        let link_path = rootfs_dir.join("lib64/ld-linux-x86-64.so.2");
+        symlink("/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2", &link_path)
+            .expect("create absolute symlink");
+
+        let resolved = canonical_within_rootfs(&rootfs_dir, &link_path)
+            .expect("resolver should treat absolute symlink target as rootfs-internal");
+        assert_eq!(resolved, target);
+
+        fs::remove_dir_all(&rootfs_dir).expect("cleanup rootfs");
+    }
+
+    #[test]
+    fn rejects_relative_path_escape_outside_rootfs() {
+        let rootfs_dir = unique_temp_dir("runtime-escape");
+        fs::create_dir_all(&rootfs_dir).expect("mkdir rootfs");
+
+        let error = canonical_within_rootfs(&rootfs_dir, Path::new("../../etc/passwd"))
+            .expect_err("path escaping rootfs should fail");
+        let message = format!("{:#}", error);
+        assert!(message.contains("escapes rootfs"));
+
+        fs::remove_dir_all(&rootfs_dir).expect("cleanup rootfs");
     }
 }

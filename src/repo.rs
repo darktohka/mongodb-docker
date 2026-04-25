@@ -1,6 +1,8 @@
 use anyhow::{anyhow, bail, Context, Result};
 use bzip2::read::BzDecoder;
 use flate2::read::GzDecoder;
+use rayon::prelude::*;
+use rayon::ThreadPool;
 use reqwest::blocking::Client;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -65,7 +67,11 @@ struct ReleaseChecksum {
     size: u64,
 }
 
-pub fn fetch_source_index(client: &Client, source: &AptSource) -> Result<PackageIndex> {
+pub fn fetch_source_index(
+    client: &Client,
+    source: &AptSource,
+    download_pool: &ThreadPool,
+) -> Result<PackageIndex> {
     let release_text = fetch_release_text(client, source)?;
     let checksums = parse_release_sha256(&release_text).with_context(|| {
         format!(
@@ -74,39 +80,18 @@ pub fn fetch_source_index(client: &Client, source: &AptSource) -> Result<Package
         )
     })?;
 
+    let component_results = download_pool.install(|| {
+        source
+            .components
+            .par_iter()
+            .map(|component| fetch_component_packages(client, source, &checksums, component))
+            .collect::<Vec<Result<Vec<PackageRecord>>>>()
+    });
+
     let mut packages = Vec::new();
-    for component in &source.components {
-        let candidates = select_packages_index_paths(component, source.arch, &checksums);
-        if candidates.is_empty() {
-            continue;
-        }
-
-        let mut parsed_any = false;
-        let mut last_error: Option<anyhow::Error> = None;
-
-        for relative_path in candidates {
-            match fetch_and_parse_index(client, source, &relative_path, &checksums) {
-                Ok(mut parsed) => {
-                    packages.append(&mut parsed);
-                    parsed_any = true;
-                    break;
-                }
-                Err(err) => {
-                    last_error = Some(err);
-                }
-            }
-        }
-
-        if !parsed_any {
-            let err =
-                last_error.unwrap_or_else(|| anyhow!("no package index candidates were usable"));
-            return Err(err).with_context(|| {
-                format!(
-                    "all package index candidates failed for component {} from source {}",
-                    component, source.name
-                )
-            });
-        }
+    for result in component_results {
+        let mut component_packages = result?;
+        packages.append(&mut component_packages);
     }
 
     if packages.is_empty() {
@@ -119,6 +104,36 @@ pub fn fetch_source_index(client: &Client, source: &AptSource) -> Result<Package
     }
 
     Ok(PackageIndex { packages })
+}
+
+fn fetch_component_packages(
+    client: &Client,
+    source: &AptSource,
+    checksums: &BTreeMap<String, ReleaseChecksum>,
+    component: &str,
+) -> Result<Vec<PackageRecord>> {
+    let candidates = select_packages_index_paths(component, source.arch, checksums);
+    if candidates.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let mut last_error: Option<anyhow::Error> = None;
+    for relative_path in candidates {
+        match fetch_and_parse_index(client, source, &relative_path, checksums) {
+            Ok(parsed) => return Ok(parsed),
+            Err(err) => {
+                last_error = Some(err);
+            }
+        }
+    }
+
+    let err = last_error.unwrap_or_else(|| anyhow!("no package index candidates were usable"));
+    Err(err).with_context(|| {
+        format!(
+            "all package index candidates failed for component {} from source {}",
+            component, source.name
+        )
+    })
 }
 
 fn fetch_and_parse_index(

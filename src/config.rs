@@ -38,6 +38,7 @@ pub struct BuilderConfig {
     pub manifest_dir: PathBuf,
     pub staging_dir: PathBuf,
     pub deb_cache_dir: PathBuf,
+    pub download_jobs: usize,
 }
 
 impl BuilderConfig {
@@ -48,6 +49,10 @@ impl BuilderConfig {
 
         if arches.is_empty() {
             bail!("at least one architecture must be specified via --arches");
+        }
+
+        if cli.download_jobs == 0 {
+            bail!("--download-jobs must be greater than 0");
         }
 
         Ok(Self {
@@ -66,6 +71,7 @@ impl BuilderConfig {
             manifest_dir: cli.manifest_dir,
             staging_dir: cli.staging_dir,
             deb_cache_dir: cli.deb_cache_dir,
+            download_jobs: cli.download_jobs,
         })
     }
 
