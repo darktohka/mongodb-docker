@@ -1,3 +1,7 @@
 db
 logs
 binary-*
+target/
+deb-cache
+package-manifests
+staging-rootfs

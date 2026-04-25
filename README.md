@@ -4,6 +4,29 @@ A very slim Docker image, containing the absolute minimum amount of libraries re
 
 This image is based on the Ubuntu devel image.
 
+## Build pipeline
+
+This repository builds runtime layers with a Rust CLI.
+
+The builder:
+
+- Resolves package metadata for Ubuntu + MongoDB APT repositories per target architecture.
+- Downloads and verifies `.deb` payloads by size and SHA256.
+- Unpacks package contents into per-architecture staging rootfs directories.
+- Computes ELF runtime closure for `mongod`
+- Emits minimal AppDir outputs used by `oci.json`:
+  - `binary-x86_64`
+  - `binary-aarch64`
+
+### Build both architectures locally
+
+```bash
+cargo run --release -- \
+  --arches amd64,arm64 \
+  --output-amd64 binary-x86_64 \
+  --output-arm64 binary-aarch64
+```
+
 ## Usage: Create config, directories and run MongoDB
 
 By default, MongoDB listens on 27017. Be sure to open this port in your firewall.
