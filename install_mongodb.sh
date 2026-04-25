@@ -55,7 +55,7 @@ function create_app_dir() {
       cp /lib64/ld-linux-*.so.* "$app_dir/lib64/" || true
     fi
 
-    cp /lib/ld-linux-*.so.* "$app_dir/lib/" || true
+    cp /usr/lib/*-linux-gnu/ld-linux-*.so.* "$app_dir/lib/" || cp /lib/ld-linux-*.so.* "$app_dir/lib/" || true
     chown -R "$user_id:$user_id" "$app_dir"
 }
 
